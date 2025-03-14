@@ -1,193 +1,147 @@
 #pragma once
 #include <vector>
-#include <set>
+#include <unordered_set>
 #include <iostream>
-#include <math.h>
 
-using namespace std;
-
-
-const int not_pt = -7;
-const int start_pt = -1;
-const int end_pt = 0;
-
-class domain;
-
-class history_element {
-private:
-public:
-	bool is_add;
-	int point;
-	history_element(bool _add, int _pt) : is_add(_add), point(_pt) {};
-};
-
-class domain_border_element {
-private:
-	int p;			//This can be a point, a the beginning/end of a curve or connection with other domain.
-	domain* d;		//Pointer to the domain to which this element belongs
-	int label;		//This use for labeling connections between domains
-
-public:
-	//constructor
-	domain_border_element(int _p, domain* _d = nullptr, int _label = 0) 
-		:p(_p), d(_d), label(_label) {}; 
-
-	void set_point(int _pt) { p = _pt; };
-	void set_domain(domain* _d) {d = _d; };
-	void set_label(int _label) { label = _label; };
-
-	domain* get_domain() { return d; };
-	int get_label() { return label; };
-	int get_point() { return p; }
-};
+/*
+ * This file defines the `domain` class, which represents regions into which a curve divides the plane.
+ * Each domain is described by its boundary, represented by a vector of integeres. Each positive integer
+ * corresponds to a marked point that later will become double points on the curve. If the integer is
+ * negative it reffers either the start or the end of an oriented curve.
+ * 
+ * Most memeber functions are technical and trivial, the only meaningful ones are:
+ *		- add_new_marked_points_before_end,
+ *		- go_throught_point.
+ */
 
 
 class domain {
 private:
-	int d_num;									//name of the domain
-	vector <domain_border_element> border;		//array with it's border elements
-	static int label_counter;					//static member for labeling connections between domains
+	constexpr static int end_point = -1'000'000;	// Technical value for the enpoint of the curve.
+	constexpr static int start_point = -9'000'000;	// Technical value for the startpoint of the curve.
+
+private:
+	int _domain_label;			// Unique identifier.
+	std::vector<int> _boundary;	// Labels of special points on the boundary. Either marked points or the ends of the curve.
+
+private:
+	// Checks if the boundary of this domain contains any element of a special type. If point_type > 0 then the marked point is searched.
+	bool contains_special_point(int point_type) const noexcept {
+		return std::find_if(_boundary.cbegin(), _boundary.cend(),
+			[&point_type](int e) {
+				return point_type < 0 ? e == point_type : e >= 0; // point_type < 0 means that it is one of the endpoint.
+			}) != _boundary.cend();
+	}
+
+	// Searches for a boundary element with a given label.
+	auto find_boundary_element(int label, bool need_last = false) noexcept {
+		auto lambda_search = [label](const int& e) { return e == label; };
+		if (need_last)
+			return std::find_if(_boundary.rbegin(), _boundary.rend(), lambda_search).base() - 1;
+		return std::find_if(_boundary.begin(), _boundary.end(), lambda_search);
+	}
 
 public:
-	//Constructors
-	//constructor for first domain
-	domain() {		
-		d_num = 0;
-		border.push_back(start_pt);
-		border.push_back(end_pt);
+	// Basic constructor.
+	explicit domain(int domain_label = 0) noexcept : _domain_label(domain_label) {
+	if (domain_label == 0)	// For the very first domain we also need to add the endpoints.
+		_boundary = { start_point, end_point };
 	}
-	//basic constructor
-	domain(int d_name) : d_num(d_name) {};
 
-	const int get_name() { return d_num; };
+	// Checks whether the boundary of this domain contains the end of the curve.
+	bool contains_endpoint() const noexcept {
+		return contains_special_point(end_point);
+	}
 
-	set <int> all_points() {
-		set <int> temp;
-		for (auto e : border) {
-			int pt = e.get_point();
-			if ((pt != end_pt) && (pt != start_pt) && (pt != not_pt))
-				temp.insert(temp.find(pt) == temp.end() ? pt : -pt);
-		}
+	// Checks whether there exists any marked point on the boundary.
+	bool contains_marked_points() const noexcept {
+		return contains_special_point(0);	// Any non-negative parameter refers to a marked point.
+	}
+
+	// Checks whether the boundary of this domain contains both endpoints.
+	bool can_be_closed() const noexcept {
+		return contains_special_point(end_point) && contains_special_point(start_point);
+	}
+
+	// Returns the unordered_set of labels of all marked points on the boundary.
+	// If a point occurs more than once, its negative label is also stored.
+	std::unordered_set<int> all_marked_points() const noexcept{
+		std::unordered_set <int> temp;
+		for (const auto& boundary_elt : _boundary)
+			if (boundary_elt > 0)
+				temp.emplace(temp.contains(boundary_elt) ? -boundary_elt : boundary_elt);
 		return temp;
 	}
 
-	domain_border_element* find_point(int pt) {
-		for (int i = 0; i < border.size(); ++i)
-			if (border[i].get_point() == pt)
-				return &border[i];
-		return nullptr;
+	// Adds new marked points before the endpoint. This function requires that an `end_point` is part of the boundary.
+	void add_new_marked_points_before_end(int start_num, int num_of_points) noexcept {
+		/*
+		* Explanation:
+		* Adding `k` new points changes the boundary structure as follows:
+		*	X [end] Y -> X p_1 p_2 ... p_k [end] p_k p_{k-1} ... p_1 Y
+		* where:
+		*	- `X` and `Y` denotes unchanged parts of the boundary.
+		*	- `[end]` denotes the endpoint.
+		*	- `p_i` denotes newly added marked points.
+		*
+		* New elements are initially treated as endpoints so that, after initializing
+		* the marked points, the endpoint position does not need to be explicitly calculated.
+		*/
+		auto it_end_point = std::find_if(_boundary.begin(), _boundary.end(),
+			[](const int& e) { return e == end_point; });
+
+		it_end_point = _boundary.insert(it_end_point, 2 * num_of_points, end_point);
+		for (int i = 0, start_index = it_end_point - _boundary.begin(); i < num_of_points; ++i) 
+			_boundary[start_index + i] = _boundary[start_index + 2 * num_of_points - i] = start_num + i;
 	}
 
-	domain_border_element* find_connection_with_label(int lab) {
-		for (int i = 0; i < border.size(); ++i)
-			if (border[i].get_label() == lab)
-				return &border[i];
-		return nullptr;
-	}
+	// Modifies the domain by moving through the transition point.
+	void go_throught_point(int transition_point, domain& new_domain, bool pass_from_left) noexcept {
+		/*
+		* Explanation:
+		* After passing through the marked point, the boundary undergoes the following changes:
+		* 1) The boundary of this domain transforms as follows:
+		*		X t Y [end] Z  ->  X Z
+		*	where:
+		*		- `X`, `Y`, `Z` are unchanged parts of the boundary.
+		*		- `[end]` is the endpoint.
+		*		- `t` is the transition point.
+		* 2) The new domain initially has an empty boundary, but after the transition, it takes the form Y,
+		*	where `Y` is the same as in the first case.
+		*/
+		auto it_start_point = find_boundary_element(transition_point, !pass_from_left),
+			it_end_point = find_boundary_element(end_point);
 
-	void add_new_points(int start_num, int n) {		
-		//renew border
-		vector <domain_border_element> new_border;
-		for (int i = 0; i < border.size(); ++i) {		
-			if (border[i].get_point() == end_pt) {		//If it is end of curve							
-				for (int i = 0; i < n; ++i) {			//before end add new points and connections between domain
-					domain_border_element new_nb(not_pt, this, ++label_counter);
-					domain_border_element new_pt(start_num + i, this);
-					new_border.push_back(new_nb);
-					new_border.push_back(new_pt);					
-				}
-				new_border.push_back(border[i]);		//than add end point
-				for (int i = 0; i < n; ++i) {			//and add new points and connections in reverse order	
-					domain_border_element new_pt(start_num + n - i - 1, this);
-					domain_border_element new_nb(not_pt, this, new_border[new_border.size() - 3 - 4 * i].get_label());
-					new_border.push_back(new_pt);
-					new_border.push_back(new_nb);
-				}
-			}
-			else
-				new_border.push_back(border[i]);
-		}
-		border = new_border;
-	}
+		if (it_start_point > it_end_point)
+			std::swap(it_start_point, it_end_point);
 
-	void go_throught_point(int tr_point, domain* new_domain, bool pass_below) {
-		//find indeces of transition point and of the end of the curve
-		int ind_start = -1,
-			ind_end = -1;
-		for (int i = 0; i < border.size(); ++i) {
-			if (border[i].get_point() == end_pt)
-				ind_start = i;
-			if (border[i].get_point() == tr_point){
-				if (pass_below)
-					ind_end = i;
-				else
-					if (ind_end == -1)
-						ind_end = i;
-			}
-			
-		}
-		if (ind_start > ind_end) 
-			swap(ind_start, ind_end);
-	
-		//change this domain border
-		vector <domain_border_element> new_border;
-		new_border.insert(new_border.end(), border.begin(), border.begin() + ind_start );
-		domain_border_element new_border_element({ not_pt }, new_domain, ++label_counter);
-		new_border.push_back(new_border_element);
-		new_border.insert(new_border.end(), border.begin() + ind_end + 1, border.end());
-
-		//change border of new domain
-		new_border_element = domain_border_element({ not_pt }, this, label_counter);
-		new_domain->border.push_back(new_border_element);
-		new_domain->border.insert(new_domain->border.end(), border.begin() + ind_start + 1, border.begin() + ind_end);
-
-		//change neighbor domain with transition point
-		domain* neighbor_by_tr_point = find_point(tr_point)->get_domain();
+		// Update the boundary of the new domain. Case 2) in explanation above.
+		new_domain._boundary.insert(new_domain._boundary.end(),
+			std::make_move_iterator(it_start_point + 1),
+			std::make_move_iterator(it_end_point));
 		
-		//renew border
-		border = new_border;
-
-		neighbor_by_tr_point->find_point(tr_point)->set_point(end_pt);
-
-		//change neighbors of domain 
-		for (int i = 1; i < new_domain->border.size(); ++i) {
-			if ((new_domain->border[i].get_point() != end_pt) && (new_domain->border[i].get_point() != start_pt)) {
-				domain* neighbor = new_domain->border[i].get_domain();
-				domain_border_element* tmp = nullptr;
-				if (new_domain->border[i].get_point() == not_pt)
-					tmp = neighbor->find_connection_with_label(new_domain->border[i].get_label());
-				else
-					tmp = neighbor->find_point(new_domain->border[i].get_point());
-				tmp->set_domain(new_domain);
-			}
-		}
+		// Update the boundary of this domain. Case 1) in explanation above.
+		it_start_point = _boundary.erase(it_start_point, it_end_point + 1);
 	}
 
-	void close_up() {
-		vector <domain_border_element> new_border;
-		for (int i = 0; i < border.size(); ++i) 
-			if ((border[i].get_point() != end_pt) && (border[i].get_point() != start_pt))
-				new_border.push_back(border[i]);
-		border = new_border;
+	// Find marked point with a given label and change it into endpoint.
+	void transform_point_into_endpoint(int marked_point_label, bool pass_from_left) noexcept {
+		*find_boundary_element(marked_point_label, pass_from_left) = end_point;
 	}
 
-	void print() {
-		cout << "\n###### DOMAIN V_" <<d_num << " ######\n";
-		for (int i = 0; i < border.size(); ++i) {
-			switch (border[i].get_point()) {
-			case start_pt:
-				cout << "\t beginning of the curve\n";
-				break;
-			case end_pt:
-				cout << "\t end of the curve\n";
-				break;
-			case not_pt:
-				cout << "\t domain V_" << border[i].get_domain()->get_name() << " (it's label " << border[i].get_label() << ")\n";
-				break;
-			default:
-				cout << "\t point " << (char)('a' + border[i].get_point() - 1) << " (it goes to V_" << border[i].get_domain()->get_name() << ")\n";
-				break;
-			}
-		}
+	int get_label() const noexcept {
+		return _domain_label;
+	}
+
+	// Prints information about the domain, including its label and boundary elements.
+	void print(std::ostream& out_stream = std::cout) const noexcept{
+		out_stream << "Domain " << _domain_label << ":\n";
+		for (const auto& boundary_elt : _boundary)
+			if (boundary_elt > 0)
+				out_stream << "\t point " << boundary_elt << "\n";
+			else if (boundary_elt == end_point)
+				out_stream << "\t end of the curve\n";
+			else
+				out_stream << "\t beginning of the curve\n";
 	}
 };

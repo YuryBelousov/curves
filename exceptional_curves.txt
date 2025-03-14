@@ -1,0 +1,10 @@
+Finding all irreducible curves with more than 6 crossings that do not contain a simple arc with 6 double points...
+There were found 0 such curves.
+
+Finding all irreducible curves with more than 8 crossings, and that do not have simple arc with 8 double points if flypes are allowed...
+There were found 4 such curves.
+Here are their Gauss codes:
+	[1] [2] [3] [4] [5] [1] [6] [3] [7] [8] [4] [6] [2] [7] [8] [5] 
+	[1] [2] [3] [4] [5] [6] [2] [7] [4] [8] [6] [1] [7] [3] [8] [5] 
+	[1] [2] [3] [4] [5] [6] [2] [7] [8] [5] [9] [3] [7] [1] [6] [9] [4] [8] 
+	[1] [2] [3] [4] [5] [1] [6] [7] [4] [8] [9] [5] [7] [10] [2] [9] [8] [3] [10] [6] 
