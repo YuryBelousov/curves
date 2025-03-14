@@ -4,9 +4,9 @@
 This repository serves as the computational foundation for the article ["Simple Arcs in Plane Curves and Knot Diagrams"](http://journal.imm.uran.ru/2017-v.23-4-pp.63-76) (in Russian). It is used to prove the following theorems:
 
 #### **Theorem 1.1** 
-In each minimal diagram of an arbitrary knot $ K $, there exists a simple arc passing through $ \min\{\text{cr}(K),6\} $ crossings, where $ \text{cr}(K) $ is the crossing number.
+In each minimal diagram of an arbitrary knot $K$, there exists a simple arc passing through $\min\{\text{cr}(K),6\}$ crossings, where $\text{cr}(K)$ is the crossing number.
 #### **Theorem 1.2.** 
-For any knot $ K $ except for the four simple knots $8_{16}$, $8_{18}$, $9_{40}$ and $10_{120}$ in the notation of the Rolfsen table, there exists a minimal diagram with a simple arc passing through $ \min\{\text{cr}(K),8\} $ crossings.
+For any knot $K$ except for the four simple knots $8_{16}$, $8_{18}$, $9_{40}$ and $10_{120}$ in the notation of the Rolfsen table, there exists a minimal diagram with a simple arc passing through $\min\{\text{cr}(K),8\}$ crossings.
 
 ## Prerequisites
 The toolkit requires a **C++20-compatible compiler**. No external dependencies are needed.
