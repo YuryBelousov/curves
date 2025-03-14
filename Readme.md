@@ -14,7 +14,7 @@ The toolkit requires a C++20-compatible compiler. No external dependencies are n
 ## Structure and Execution
 The main execution logic is contained in **`Source.cpp`**.  
 - **`Prediagram.h`** defines the `pre_diagram` class, which is central to the algorithm.  
-- **`Domain.h`** provides technical classes used within `pre_diagram`.  
+- **`Domain.h`** provides the technical class used within `pre_diagram`.  
 
 After execution, the program generates **`exceptional_curves.txt`**, containing Gauss codes of all exceptional curves.
 
@@ -30,4 +30,4 @@ The program systematically iterates through all possible pre-diagrams, discardin
 - For **Theorem 1.1**: The set of exceptional cases is empty.
 - For **Theorem 1.2**: Every exceptional pre-diagram can be extended into a diagram belonging to one of four specific cases listed in the theorem.
 
-For more details, see the comments in the source files.
+For more technical details, see the comments in the source files.
